@@ -19,7 +19,7 @@ import random
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter('./logs/dueling')
+writer = SummaryWriter('./logs/ddqn')
 
 # ##Hyperparameters
 # GAMMA = TD target discount rate
@@ -54,6 +54,7 @@ LR = 2.5e-4
 # #Environment
 # 
 
+
 #cnn architecture outline in the paper (which was published in the journal nature)
 def nature_cnn(observation_space, depths=(32, 64, 64), final_layer=512):
   n_input_channels = observation_space.shape[0]
@@ -75,7 +76,8 @@ def nature_cnn(observation_space, depths=(32, 64, 64), final_layer=512):
 
   return out
 
-class Dueling_Network(nn.Module):
+
+class Network(nn.Module):
   def __init__(self, env, device):
     super().__init__()
 
@@ -84,35 +86,22 @@ class Dueling_Network(nn.Module):
 
     conv_net = nature_cnn(env.observation_space)
 
-    # Shared feature extractor
-    self.feature_extractor = conv_net
-
-    # Dueling network branches
-    self.value_stream = nn.Sequential(
-        nn.Linear(512, 256),  # Adjust this size as needed
-        nn.ReLU(),
-        nn.Linear(256, 1)
-    )
-
-    self.advantage_stream = nn.Sequential(
-        nn.Linear(512, 256),  # Adjust this size as needed
-        nn.ReLU(),
-        nn.Linear(256, self.num_actions)
+    self.net = nn.Sequential(
+        conv_net,
+        nn.Linear(512, self.num_actions)
     )
 
   #The forward function is required to run any PyTorch network
   def forward(self, x):
-        # Forward pass through the shared feature extractor
-        features = self.feature_extractor(x)
+    return self.net(x)
 
-        # Compute value and advantage streams
-        value = self.value_stream(features)
-        advantage = self.advantage_stream(features)
+  def act(self, obs):
+    obs_t = torch.as_tensor(np.array(obs), dtype=torch.float32, device=self.device)
+    q_values = self(obs_t.unsqueeze(0)) #unsqueeze 0 to create a fake batch dimension because pytorch operations expect a batched dimension, we are not using a batched env
+    max_q_index = torch.argmax(q_values, dim=1)[0]
+    action = max_q_index.detach().item() #turn pytorch tensor into an integer using detach method
 
-        # Combine value and advantage to get Q-values
-        q_values = value + (advantage - advantage.mean(dim=1, keepdim=True))
-
-        return q_values
+    return action
   
   def act(self, obs):
     obs_t = torch.as_tensor(np.array(obs), dtype=torch.float32, device=self.device)
@@ -143,8 +132,8 @@ episode_reward = 0.0
 
 # #Create neural networks
 
-online_network = Dueling_Network(env, device=device)
-target_network = Dueling_Network(env, device=device)
+online_network = Network(env, device=device)
+target_network = Network(env, device=device)
 
 online_network =online_network.to(device)
 target_network = target_network.to(device)
@@ -255,13 +244,17 @@ for step in itertools.count():
 
   #Compute Targets
   ################
+  online_q_values = online_network(new_obses_t)
+  best_online_q_index = online_q_values.argmax(dim=1, keepdim=True)
+
   target_q_values = target_network(new_obses_t)
 
   #we want the highest q-value per observation
-  max_target_q_values = target_q_values.max(dim=1, keepdim=True)[0]
+  #max_target_q_values = target_q_values.max(dim=1, keepdim=True)[0]
+  target_selected_q_values = torch.gather(input = target_q_values, dim=1, index = best_online_q_index)
 
   #if the episode is over (dones_t = 1) then we zero out the rest of the function only leaving the reward
-  targets = rewards_t + GAMMA * (1 - dones_t) * max_target_q_values
+  targets = rewards_t + GAMMA * (1 - dones_t) * target_selected_q_values
 
   #Compute Loss
   #############
@@ -294,7 +287,7 @@ for step in itertools.count():
     writer.add_scalar("Avg reward", reward_mean, global_step = step)
 
   if step % 1000000 == 0:
-    torch.save(online_network.state_dict(), "/homes/mat66/RL-team/saved_models/trained_deuling_"+str(step))
+    torch.save(online_network.state_dict(), "/homes/mat66/RL-team/saved_models/trained_ddqn_"+str(step))
 
 #Limits training
   if reward_mean > 50:
@@ -307,7 +300,7 @@ writer.close()
 
 #open in vs code extension or in the terminal write "tensorboard --logdir ./logs"
 
-torch.save(online_network.state_dict(), "/homes/mat66/RL-team/saved_models/trained_dueling")
+torch.save(online_network.state_dict(), "/homes/mat66/RL-team/saved_models/trained_ddqn")
 
 
 

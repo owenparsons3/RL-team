@@ -1,7 +1,7 @@
 # This code is adapted from a YouTube Tutorial by brthor.
 # (Source: https://www.youtube.com/watch?v=tsy1mgB7hB0&t=0s retrieved in April 2024.)
 
-#you may need to pip install "gym[atari, accept-rom-license]" before running this code
+#you may need to pip install "gymnasium[atari, accept-rom-license]" before running this code
 
 # #Set up
 import torch
@@ -53,28 +53,6 @@ LR = 2.5e-4
 
 # #Environment
 # 
-
-#This class is required for PyTorch to be able to read the images from the game
-class TransposeImageObs(gym.ObservationWrapper):
-    def __init__(self, env, op):
-        super().__init__(env)
-        assert len(op) == 3, "Op must have 3 dimensions"
-
-        self.op = op
-
-        obs_shape = self.observation_space.shape
-        self.observation_space = gym.spaces.Box(
-            self.observation_space.low[0, 0, 0],
-            self.observation_space.high[0, 0, 0],
-            [
-                obs_shape[self.op[0]],
-                obs_shape[self.op[1]],
-                obs_shape[self.op[2]]
-            ],
-            dtype=self.observation_space.dtype)
-
-    def observation(self, obs):
-        return obs.transpose(self.op[0], self.op[1], self.op[2])
 
 #cnn architecture outline in the paper (which was published in the journal nature)
 def nature_cnn(observation_space, depths=(32, 64, 64), final_layer=512):
@@ -195,17 +173,26 @@ for step in itertools.count():
     action = online_network.act(obs)
 
   # Interact with the environment every 4th frame
-  if step % 4 == 0:
-      # Take a step in the environment based on the action and get the new observations, reward, and whether the episode is over
-      # Store this information in the replay buffer
-      # Set observation to the new observation and add set reward to episode reward
-      new_obs, reward, done, _, info = env.step(action)
-      transition = (obs, action, reward, done, new_obs)
-      replay_buffer.append(transition)
-      obs = new_obs
-  else:
-      # Repeat the last action on the skipped frames
-      new_obs, reward, done, _, info = env.step(action)
+  # if step % 4 == 0:
+  #     # Take a step in the environment based on the action and get the new observations, reward, and whether the episode is over
+  #     # Store this information in the replay buffer
+  #     # Set observation to the new observation and add set reward to episode reward
+  #     new_obs, reward, done, _, info = env.step(action)
+  #     transition = (obs, action, reward, done, new_obs)
+  #     replay_buffer.append(transition)
+  #     obs = new_obs
+  # else:
+  #     # Repeat the last action on the skipped frames
+  #     new_obs, reward, done, _, info = env.step(action)
+    
+
+  # Take a step in the environment based on the action and get the new observations, reward, and whether the episode is over
+  # Store this information in the replay buffer
+  # Set observation to the new observation and add set reward to episode reward
+  new_obs, reward, done, _, info = env.step(action)
+  transition = (obs, action, reward, done, new_obs)
+  replay_buffer.append(transition)
+  obs = new_obs
 
   episode_reward += reward
 
@@ -234,7 +221,7 @@ for step in itertools.count():
 #   obses = np.array(obslist)
   actions = np.asarray([np.array(t[1]) for t in transitions])
   rewards = np.asarray([np.array(t[2]) for t in transitions])
-  rewards = np.clip(rewards, -1, 1) # preprocessing clipping rewards between -1 and 1 (While applying DQN to different environment settings,
+  #rewards = np.clip(rewards, -1, 1) # preprocessing clipping rewards between -1 and 1 (While applying DQN to different environment settings,
                                     # where reward points are not on the same scale, the training becomes inefficient.)
   dones = np.asarray([np.array(t[3]) for t in transitions])
   new_obses = np.asarray([np.array(t[4]) for t in transitions])
@@ -286,8 +273,11 @@ for step in itertools.count():
 
     writer.add_scalar("Avg reward", reward_mean, global_step = step)
 
+  if step % 1000000 == 0:
+    torch.save(online_network.state_dict(), "/homes/mat66/RL-team/saved_models/trained_preprocessed_"+str(step))
+
 #Limits training
-  if reward_mean > 8:
+  if reward_mean > 50:
     break
 
 
@@ -297,7 +287,7 @@ writer.close()
 
 #open in vs code extension or in the terminal write "tensorboard --logdir ./logs"
 
-torch.save(online_network.state_dict(), "trained_reward8")
+torch.save(online_network.state_dict(), "/homes/mat66/RL-team/saved_models/trained_preprocessed")
 
 
 

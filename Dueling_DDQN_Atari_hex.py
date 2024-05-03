@@ -19,7 +19,7 @@ import random
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter('./logs/dueling')
+writer = SummaryWriter('./logs/dueling_ddqn')
 
 # ##Hyperparameters
 # GAMMA = TD target discount rate
@@ -294,12 +294,11 @@ for step in itertools.count():
     writer.add_scalar("Avg reward", reward_mean, global_step = step)
 
   if step % 1000000 == 0:
-    torch.save(online_network.state_dict(), "/homes/mat66/RL-team/saved_models/trained_deuling_"+str(step))
+    torch.save(online_network.state_dict(), "/homes/mat66/RL-team/saved_models/trained_deuling_ddqn_"+str(step))
 
 #Limits training
   if reward_mean > 50:
     break
-
 
 writer.flush()
 
@@ -307,7 +306,7 @@ writer.close()
 
 #open in vs code extension or in the terminal write "tensorboard --logdir ./logs"
 
-torch.save(online_network.state_dict(), "/homes/mat66/RL-team/saved_models/trained_dueling")
+torch.save(online_network.state_dict(), "/homes/mat66/RL-team/saved_models/trained_deuling_ddqn")
 
 
 
