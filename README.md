@@ -39,3 +39,7 @@ In this project, we implement variations of the DQN algorithm to train an agent 
 - torch
 - Gym (used in notebooks)
 - Gymnasium (used in python files)
+
+## Tutorial Used
+This code is adapted from a YouTube Tutorial by brthor. (Source: https://www.youtube.com/watch?v=NP8pXZdU-5U&t=0s retrieved in April 2024.)
+
